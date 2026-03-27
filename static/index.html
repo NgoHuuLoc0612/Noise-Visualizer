@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NOISE VISUALIZER</title>
+<link rel="stylesheet" href="style.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+<!-- ── HEADER ──────────────────────────────────────────────────────────── -->
+<header id="app-header">
+  <div class="header-left">
+    <div class="logo-mark">NV</div>
+    <div class="header-title">
+      <span class="title-main">NOISE VISUALIZER</span>
+      <span class="title-sub">STOCHASTIC FIELD ENGINE</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="engine-badge" id="engine-badge">
+      <span class="badge-dot"></span>
+      <span class="badge-text">CONNECTING…</span>
+    </div>
+    <div class="perf-counter"><span id="perf-ms">—</span> ms</div>
+  </div>
+</header>
+
+<!-- ── MAIN LAYOUT ─────────────────────────────────────────────────────── -->
+<main id="app-main">
+
+  <!-- LEFT PANEL — Controls -->
+  <aside id="panel-controls">
+    <div class="panel-section">
+      <div class="section-label">ALGORITHM</div>
+      <div id="algo-grid" class="algo-grid"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">PARAMETERS</div>
+
+      <label class="ctrl-row">
+        <span>Scale</span>
+        <input type="range" id="p-scale" min="0.5" max="20" step="0.1" value="4"/>
+        <span class="val-display" id="v-scale">4.0</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Octaves</span>
+        <input type="range" id="p-octaves" min="1" max="12" step="1" value="6"/>
+        <span class="val-display" id="v-octaves">6</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Lacunarity</span>
+        <input type="range" id="p-lacunarity" min="1" max="4" step="0.01" value="2"/>
+        <span class="val-display" id="v-lacunarity">2.00</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Gain / H</span>
+        <input type="range" id="p-gain" min="0.1" max="1.0" step="0.01" value="0.5"/>
+        <span class="val-display" id="v-gain">0.50</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Warp Str.</span>
+        <input type="range" id="p-warp" min="0" max="4" step="0.05" value="1.5"/>
+        <span class="val-display" id="v-warp">1.50</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Contrast</span>
+        <input type="range" id="p-contrast" min="0.1" max="3" step="0.05" value="1"/>
+        <span class="val-display" id="v-contrast">1.00</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Brightness</span>
+        <input type="range" id="p-brightness" min="-1" max="1" step="0.01" value="0"/>
+        <span class="val-display" id="v-brightness">0.00</span>
+      </label>
+
+      <label class="ctrl-row">
+        <span>Seed</span>
+        <input type="number" id="p-seed" value="42" min="0" max="99999999"/>
+        <button class="btn-xs" id="btn-rand-seed">⟳</button>
+      </label>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">RESOLUTION</div>
+      <div class="res-group">
+        <button class="res-btn active" data-w="256" data-h="256">256²</button>
+        <button class="res-btn" data-w="512" data-h="512">512²</button>
+        <button class="res-btn" data-w="1024" data-h="1024">1K</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">COLORMAP</div>
+      <div id="colormap-grid" class="colormap-grid"></div>
+      <div id="custom-colors" style="display:none" class="custom-color-row">
+        <label>Low <input type="color" id="c-low" value="#000000"/></label>
+        <label>High <input type="color" id="c-high" value="#ffffff"/></label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">OPTIONS</div>
+      <label class="toggle-row">
+        <input type="checkbox" id="p-invert"/> Invert
+      </label>
+      <label class="toggle-row">
+        <input type="checkbox" id="p-seamless"/> Seamless tile
+      </label>
+    </div>
+
+    <div class="panel-section action-section">
+      <button class="btn-generate" id="btn-generate">GENERATE</button>
+      <div class="action-row">
+        <button class="btn-sm" id="btn-export-png">PNG</button>
+        <button class="btn-sm" id="btn-export-raw">RAW</button>
+        <button class="btn-sm" id="btn-export-json">JSON</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">ANIMATION</div>
+      <label class="ctrl-row">
+        <span>Speed</span>
+        <input type="range" id="anim-speed" min="0.01" max="0.5" step="0.005" value="0.04"/>
+        <span class="val-display" id="v-animspeed">0.04</span>
+      </label>
+      <label class="ctrl-row">
+        <span>FPS</span>
+        <input type="range" id="anim-fps" min="1" max="30" step="1" value="12"/>
+        <span class="val-display" id="v-animfps">12</span>
+      </label>
+      <div class="action-row">
+        <button class="btn-sm" id="btn-anim-start">▶ PLAY</button>
+        <button class="btn-sm" id="btn-anim-stop">■ STOP</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER — Canvas + viewer tabs -->
+  <section id="panel-center">
+    <div class="viewer-tabs">
+      <button class="vtab active" data-tab="canvas">FIELD</button>
+      <button class="vtab" data-tab="3d">3D SURFACE</button>
+      <button class="vtab" data-tab="histogram">HISTOGRAM</button>
+      <button class="vtab" data-tab="autocorr">AUTOCORR</button>
+      <button class="vtab" data-tab="spectrum">SPECTRUM</button>
+      <button class="vtab" data-tab="waveform">WAVEFORM</button>
+    </div>
+
+    <div class="viewer-body">
+      <!-- 2D canvas view -->
+      <div class="tab-pane active" id="tab-canvas">
+        <div class="canvas-wrapper">
+          <canvas id="main-canvas"></canvas>
+          <div id="canvas-overlay" class="canvas-overlay">
+            <div class="overlay-crosshair" id="crosshair"></div>
+          </div>
+          <div class="canvas-info" id="canvas-info">—</div>
+        </div>
+        <div class="zoom-controls">
+          <button class="btn-xs" id="btn-zoom-in">+</button>
+          <button class="btn-xs" id="btn-zoom-out">−</button>
+          <button class="btn-xs" id="btn-zoom-fit">FIT</button>
+          <span id="zoom-level">100%</span>
+        </div>
+      </div>
+
+      <!-- 3D surface view -->
+      <div class="tab-pane" id="tab-3d">
+        <canvas id="canvas-3d"></canvas>
+      </div>
+
+      <!-- Histogram -->
+      <div class="tab-pane" id="tab-histogram">
+        <canvas id="chart-histogram"></canvas>
+      </div>
+
+      <!-- Autocorrelation -->
+      <div class="tab-pane" id="tab-autocorr">
+        <canvas id="chart-autocorr"></canvas>
+      </div>
+
+      <!-- Power spectrum -->
+      <div class="tab-pane" id="tab-spectrum">
+        <canvas id="chart-spectrum"></canvas>
+      </div>
+
+      <!-- 1D waveform -->
+      <div class="tab-pane" id="tab-waveform">
+        <canvas id="chart-waveform"></canvas>
+        <div class="waveform-controls">
+          <label>Row <input type="range" id="wave-row" min="0" max="511" step="1" value="256"/></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL — Statistics -->
+  <aside id="panel-stats">
+    <div class="section-label">STATISTICS</div>
+    <table class="stats-table" id="stats-table">
+      <tr><td>Mean</td><td id="st-mean">—</td></tr>
+      <tr><td>Std Dev</td><td id="st-std">—</td></tr>
+      <tr><td>Variance</td><td id="st-var">—</td></tr>
+      <tr><td>Min</td><td id="st-min">—</td></tr>
+      <tr><td>Max</td><td id="st-max">—</td></tr>
+      <tr><td>Skewness</td><td id="st-skew">—</td></tr>
+      <tr><td>Kurtosis</td><td id="st-kurt">—</td></tr>
+    </table>
+
+    <div class="section-label" style="margin-top:1.5rem">THEORY</div>
+    <div class="theory-card" id="theory-card">
+      Select an algorithm to see its mathematical basis.
+    </div>
+
+    <div class="section-label" style="margin-top:1.5rem">HISTORY</div>
+    <div class="history-list" id="history-list"></div>
+  </aside>
+
+</main>
+
+<!-- ── LOADING OVERLAY ─────────────────────────────────────────────────── -->
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="loading-inner">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">GENERATING…</div>
+  </div>
+</div>
+
+<!-- ── TOOLTIP ────────────────────────────────────────────────────────── -->
+<div id="tooltip" class="tooltip hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
